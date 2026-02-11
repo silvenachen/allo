@@ -1206,7 +1206,15 @@ class Schedule:
                 return ele
         return []
 
-    def build(self, target=None, mode=None, project=None, configs=None, wrap_io=True):
+    def build(
+        self,
+        target=None,
+        mode=None,
+        project=None,
+        configs=None,
+        wrap_io=True,
+        source_file=None,
+    ):
         if target is None or target == "llvm":
             target = "llvm"
             return LLVMModule(
@@ -1224,6 +1232,8 @@ class Schedule:
                     platform = "intel_hls"
                 case _:
                     platform = "vivado_hls"
+            # Use explicitly provided source_file, or fall back to stored path
+            sf = source_file or getattr(self, "_source_file", None)
             return HLSModule(
                 self.module,
                 top_func_name=self.top_func_name,
@@ -1234,6 +1244,7 @@ class Schedule:
                 configs=configs,
                 func_args=self.func_args,
                 wrap_io=wrap_io,
+                source_file=sf,
             )
         raise NotImplementedError(f"Target {target} is not supported")
 
@@ -1305,6 +1316,8 @@ def customize(
         inst_list=instantiate,
         func_instances=func_instances,
     )
+    # Store the source file path for source map generation
+    sch._source_file = file_name  # pylint: disable=protected-access
     # Attach buffers to schedule:
     # The reason why we do not attach buffers to function is that
     # we may have multiple schedules referring to the same function,

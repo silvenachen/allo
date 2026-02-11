@@ -36,6 +36,7 @@ from ..passes import (
 from ..harness.makefile_gen.makegen import generate_makefile
 from ..ir.transform import find_func_in_module
 from ..utils import get_func_inputs_outputs, c2allo_type
+from .source_map import generate_source_map, write_source_map
 
 
 def is_available(backend="vivado_hls"):
@@ -157,6 +158,7 @@ class HLSModule:
         configs=None,
         func_args=None,
         wrap_io=True,
+        source_file=None,
     ):
         self.top_func_name = top_func_name
         self.mode = mode
@@ -327,6 +329,20 @@ class HLSModule:
                         os.path.join(project, "run.tcl"), "w", encoding="utf-8"
                     ) as tcl_file:
                         tcl_file.write(new_tcl)
+
+            # Generate source map for LightningSim / OmniSim integration
+            try:
+                smap = generate_source_map(
+                    self.hls_code, top_func_name, source_file=source_file
+                )
+                smap_path = os.path.join(project, "source_map.json")
+                write_source_map(smap, smap_path)
+                self.source_map = smap
+                self.source_map_path = smap_path
+            except Exception:  # pylint: disable=broad-except
+                # Source map generation is best-effort; don't break the build
+                self.source_map = None
+                self.source_map_path = None
 
     def __repr__(self):
         if self.mode is None:
