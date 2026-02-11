@@ -361,12 +361,27 @@ def codegen_host(top, module):
     return out_str
 
 
+def _parse_array_depth(var_with_dims):
+    """Extract array depth (total element count) from a declaration like ``v382[2048],``.
+
+    Handles multi-dimensional arrays (e.g. ``v382[100][200],`` -> 20000).
+    Returns (var_name, depth) where *depth* is the product of all dimensions,
+    or 0 if no valid dimensions could be parsed.
+    """
+    import re
+    dims = re.findall(r"\[(\d+)\]", var_with_dims)
+    depth = 1
+    for d in dims:
+        depth *= int(d)
+    return depth if dims else 0
+
+
 def postprocess_hls_code(hls_code, top=None, pragma=True):
     out_str = ""
     func_decl = False
     has_endif = False
     extern_decl = False
-    func_args = []
+    func_args = []  # list of (var_name, depth) tuples
     for line in hls_code.split("\n"):
         if line == "using namespace std;" or line.startswith("#ifndef"):
             out_str += line + "\n"
@@ -384,17 +399,19 @@ def postprocess_hls_code(hls_code, top=None, pragma=True):
             out_str += line + "\n"
             # Add extra interfaces
             if pragma:
-                for i, arg in enumerate(func_args):
-                    out_str += f"  #pragma HLS interface m_axi port={arg} offset=slave bundle=gmem{i}\n"
+                for i, (arg, depth) in enumerate(func_args):
+                    depth_str = f" depth={depth}" if depth > 0 else ""
+                    out_str += f"  #pragma HLS interface m_axi port={arg} offset=slave bundle=gmem{i}{depth_str}\n"
         elif func_decl:
             if pragma:
                 dtype, var = line.strip().rsplit(" ", 1)
                 comma = "," if var[-1] == "," else ""
                 if "[" in var:  # array
+                    depth = _parse_array_depth(var)
                     var = var.split("[")[0]
                     out_str += "  " + dtype + " *" + var + f"{comma}\n"
                     # only add array to interface
-                    func_args.append(var)
+                    func_args.append((var, depth))
                 else:  # scalar
                     var = var.split(",")[0]
                     out_str += "  " + dtype + " " + var + f"{comma}\n"
