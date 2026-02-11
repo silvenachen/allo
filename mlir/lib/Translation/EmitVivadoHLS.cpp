@@ -2218,6 +2218,10 @@ void ModuleEmitter::emitFunctionDirectives(func::FuncOp func,
     indent();
     os << "#pragma HLS inline\n";
   }
+  else if (!func->hasAttr("top")) {
+    indent();
+    os << "#pragma HLS inline off\n";
+  }
 
   // Emit other pragmas for function ports.
   for (auto &port : portList)

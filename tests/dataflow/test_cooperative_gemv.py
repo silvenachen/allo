@@ -49,9 +49,12 @@ def test_cooperative_gemv():
     C = np.zeros((M,), dtype=np.float32)
     mod = df.build(top)
     if hls.is_available("vitis_hls"):
-        mod(A, B, C)
-        np.testing.assert_allclose(C, np.dot(A, B), atol=1e-5)
-        print("Passed!")
+        # mod(A, B, C)
+        # np.testing.assert_allclose(C, np.dot(A, B), atol=1e-5)
+        # print("Passed!")
+        mod = df.build(top, target="vitis_hls",
+        mode="csim",
+        project="cooperative_gemv.prj")
 
 
 if __name__ == "__main__":

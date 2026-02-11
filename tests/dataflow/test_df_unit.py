@@ -65,4 +65,4 @@ def test_func_index():
 
 if __name__ == "__main__":
     test_uint()
-    test_func_index()
+    # test_func_index()

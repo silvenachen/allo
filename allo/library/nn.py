@@ -245,6 +245,28 @@ def scaled_dot_product_attention[
 
     return Z
 
+def mini_sdp[
+    Ty, H, L, D, M0, M1
+](Q: "Ty[L, D]", K: "Ty[L, D]")-> "Ty[L, L]":
+    Z: Ty[L, L]
+    # omit softmax as well
+    for h in range(H):
+        Q_h: Ty[L, D // H]
+        K_h: Ty[D // H, L]
+
+        # split Q, K
+        for i, j in dsl.grid(L, D // H, name="mha_split_mini"):
+            Q_h[i, j] = Q[i, h * (D // H) + j]
+            # transposed
+            K_h[j, i] = K[i, h * (D // H) + j]
+
+        # QK^T = (L, D//H) x (D//H, L) = (L, L)
+        Y: Ty[L, L] = 0
+        systolic[Ty, Ty, Ty, L, D // H, L, M0, M1, "QKT_mini"](Q_h, K_h, Y)
+
+        for i, j in dsl.grid(L, L, name="mha_merge_mini"):
+            Z[i, j] = Z[i, j] + Y[i, j]
+    return Z
 
 def RoPE[
     Ty, H, L, D

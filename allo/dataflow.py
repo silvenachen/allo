@@ -394,7 +394,8 @@ def region():
 
 
 def df_primitive_default(s):
-    df_pipeline(s.module, rewind=True)
+    # df_pipeline(s.module, rewind=True)
+    df_pipeline(s.module, rewind=False)
 
 
 def customize(func, opt_default=True, enable_tensor=False):

@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import allo
-from allo.ir.types import float32
+# from allo.ir.types import int32
+from allo.ir.types import int32
 import allo.dataflow as df
 import allo.backend.hls as hls
 import numpy as np
@@ -13,11 +14,11 @@ P0, P1 = M + 2, N + 2
 
 @df.region()
 def top():
-    fifo_A = df.array(df.pipe(dtype=float32, shape=(), depth=4), shape=(P0, P1))
-    fifo_B = df.array(df.pipe(dtype=float32, shape=(), depth=4), shape=(P0, P1))
+    fifo_A = df.array(df.pipe(dtype=int32, shape=(), depth=4), shape=(P0, P1))
+    fifo_B = df.array(df.pipe(dtype=int32, shape=(), depth=4), shape=(P0, P1))
 
     @df.kernel(mapping=[P0, P1])
-    def gemm(A: float32[M, K], B: float32[K, N], C: float32[M, N]):
+    def gemm(A: int32[M, K], B: int32[K, N], C: int32[M, N]):
         i, j = df.get_pid()
         # periperals kernels
         with allo.meta_if(i in {0, M + 1} and j in {0, N + 1}):
@@ -33,16 +34,16 @@ def top():
         # drain
         with allo.meta_elif(i == M + 1 and j > 0):
             for k in range(K):
-                b: float32 = fifo_B[i, j].get()
+                b: int32 = fifo_B[i, j].get()
         with allo.meta_elif(j == N + 1 and i > 0):
             for k in range(K):
-                a: float32 = fifo_A[i, j].get()
+                a: int32 = fifo_A[i, j].get()
         # main body
         with allo.meta_else():
-            c: float32 = 0
+            c: int32 = 0
             for k in range(K):
-                a: float32 = fifo_A[i, j].get()
-                b: float32 = fifo_B[i, j].get()
+                a: int32 = fifo_A[i, j].get()
+                b: int32 = fifo_B[i, j].get()
                 c += a * b
                 fifo_A[i, j + 1].put(a)
                 fifo_B[i + 1, j].put(b)
@@ -50,9 +51,9 @@ def top():
 
 
 def test_systolic():
-    A = np.random.rand(M, K).astype(np.float32)
-    B = np.random.rand(K, N).astype(np.float32)
-    C = np.zeros((M, N), dtype=np.float32)
+    A = np.random.rand(M, K).astype(np.int32)
+    B = np.random.rand(K, N).astype(np.int32)
+    C = np.zeros((M, N), dtype=np.int32)
 
     sim_mod = df.build(top, target="simulator")
     sim_mod(A, B, C)
@@ -65,8 +66,8 @@ def test_systolic():
         s.partition("top:B", dim=2, factor=2)
         s.partition("top:C", dim=0, factor=2)
         #mod = s.build(target="vitis_hls", mode="sw_emu", project="systolic.prj")
-        mod = s.build(target="vitis_hls", mode="csim", project="systolic_lstest_rewind.prj")
-        C = np.zeros((M, N), dtype=np.float32)
+        mod = s.build(target="vitis_hls", mode="csim", project="systolic_int.prj")
+        C = np.zeros((M, N), dtype=np.int32)
         mod(A, B, C)
         np.testing.assert_allclose(C, np.dot(A, B), atol=1e-5)
         print("Passed!")
